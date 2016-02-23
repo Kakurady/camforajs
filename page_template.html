@@ -5,35 +5,97 @@
   <title>Page Title</title>
 
   <script src="ext/d3/d3.js" charset="utf-8"></script>
+  <script src="ext/gl-matrix/gl-matrix.js" charset="utf-8"></script>
 
 <body>
 
 <!-- run after the DOM is ready  -->
 <script type="text/javascript">
+  glMatrix.setMatrixArrayType(Array);
+  
+  // our canvas element. a d3 selection containing one (1) svg element
   var s = d3.select("body").append("svg");
+  
+  /// list of leader (human-controlled) robots (usually only one).
+  var leaders = [
+    { 
+      // question: 2-axis, 3-axis, or homogenous coordinates?
+      pos: [400, 240, 0],
+      /// max movement speed, in pixels per second.
+      speed:  200,
+      
+      // implementation-specific? ( will need to be rebuilt for robots )
+      movementStartPos: [0, 0, 0],
+      movementStartTime: -1,
+      movementEndPos: [0, 0, 0],
+      movementEndTime: 0
+    }
+  ];
+  
+  /// elapsed time in simulation (in seconds)
+  var simulationTime = 0;
+  /// when running in real time, the epoch from when the simulation time is counted.
+  /// (scheduler private variable; may change due to pausing simulations)
+  var startTime;
 
   s.attr("width", 800);
   s.attr("height", 480);
 
-  var circle_selection = s.selectAll("circle");
-  
+  function moveLeader(simulationTime){
+    var leader = leaders[0];
+    
+    vec3.lerp(
+      leader.pos, 
+      leader.movementStartPos, 
+      leader.movementEndPos, 
+      (simulationTime - leader.movementStartTime) / (leader.movementEndTime - leader.movementStartTime)
+    );
+    
+    if (simulationTime >= leader.movementEndTime){
+      // FIXME perf: creates garbage
+      var offset = vec3.fromValues(400, 240, 0);
+      var howfar = vec3.create();
+      
+      vec3.copy(leader.movementStartPos, leader.pos);
+      leader.movementStartTime = simulationTime;
+      
+      vec2.random(leader.movementEndPos, 240);
+      vec3.add(leader.movementEndPos, leader.movementEndPos, offset);
+      // figure out the animation end time
+      vec3.sub(howfar, leader.pos, leader.movementEndPos);
+      var duration = vec2.length(howfar) / leader.speed;
+      // set a random speed
+      duration = duration * ( 0.5 + Math.random(0.5) );
+      leader.movementEndTime = leader.movementStartTime + duration;
+    }
+    
+  }
+
   function renderGraphics(data){
-    var circle_update = s.selectAll("circle").data(data);
+    var circle_update = s.selectAll("circle.robot").data(data);
 
     circle_update.enter()
       .append("circle")
-      .classed("robot", true);
+      .classed("robot", true)
+      .attr("r", 15);
     circle_update
       .attr("cx", function(d) { return d[0]; })
       .attr("cy", function(d) { return d[1]; })
-      .attr("r", 15);  
     circle_update.exit().remove();
   }
   
-  function drawNextFrame(){
-    renderGraphics(
-      [[40, Date.now()/2 % 500]]   );
+  function drawNextFrame(timestamp){
+  //https://developer.mozilla.org/en-US/docs/Games/Anatomy
+  
     window.requestAnimationFrame(drawNextFrame);
+    
+    startTime = startTime || timestamp;
+    simulationTime = (timestamp - startTime) / 1024;
+    
+    moveLeader(simulationTime);
+    
+    renderGraphics(
+      [leaders[0].pos]   );
   }
   
   // FIXME: requestAnimationFrame won't work in IE9.
