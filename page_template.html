@@ -13,9 +13,6 @@
 <script type="text/javascript">
   glMatrix.setMatrixArrayType(Array);
   
-  // our canvas element. a d3 selection containing one (1) svg element
-  var s = d3.select("body").append("svg");
-  
   /// list of leader (human-controlled) robots (usually only one).
   var leaders = [
     { 
@@ -24,6 +21,7 @@
       /// max movement speed, in pixels per second.
       speed:  200,
       
+      // currently assuming zero turning radius... zero minimum movement distance
       // implementation-specific? ( will need to be rebuilt for robots )
       movementStartPos: [0, 0, 0],
       movementStartTime: -1,
@@ -32,15 +30,61 @@
     }
   ];
   
+  var robots = [];
+  
   /// elapsed time in simulation (in seconds)
   var simulationTime = 0;
   /// when running in real time, the epoch from when the simulation time is counted.
   /// (scheduler private variable; may change due to pausing simulations)
   var startTime;
+  
+  /// data passed to renderer. May not countain all data from source.
+  /// (core private variable, cached to minimize GC)
+  var renderData = {
+    leaders: leaders,
+    robots: robots
+  }
+  
+  var rendererOptions = {};
+  var svgRenderer = (function makeSVGRenderer( options ){
+    // our canvas element. a d3 selection containing one (1) svg element
+    var s = d3.select("body").append("svg");
+    s.attr("width", 800);
+    s.attr("height", 480);
+  
+    function renderGraphics(data){
+      var leader_update = s.selectAll("circle.leader").data(data.leaders);
 
-  s.attr("width", 800);
-  s.attr("height", 480);
+      leader_update.enter()
+        .append("circle")
+        .classed("leader", true)
+        .attr("r", 15);
+      leader_update
+        .attr("cx", function(d) { return d.pos[0]; })
+        .attr("cy", function(d) { return d.pos[1]; })
+      leader_update.exit().remove();
+      
+      var robot_update = s.selectAll("circle.robot").data(data.robots);
 
+      robot_update.enter()
+        .append("circle")
+        .classed("robot", true)
+        .attr("r", 15);
+      robot_update
+        .attr("cx", function(d) { return d.pos[0]; })
+        .attr("cy", function(d) { return d.pos[1]; })
+      robot_update.exit().remove();
+    }
+    
+    return {
+      attachedElement: s,
+      renderGraphics: renderGraphics,
+      addRobot: function addRobot(){ ; }
+    };
+  })( rendererOptions );
+  
+  var renderer = svgRenderer;
+  
   // FIXME HACK making sure the leader starts at its position (need better method for robots)
   vec3.copy (leaders[0].movementEndPos, leaders[0].pos);
   function moveLeader(simulationTime){
@@ -74,7 +118,7 @@
       );
     
     if (simulationTime >= leader.movementEndTime){
-      // FIXME perf: creates garbage
+      // FIXME perf: creates garbage that needs to be collected
       var offset = vec3.fromValues(400, 240, 0);
       var howfar = vec3.create();
       
@@ -98,41 +142,34 @@
 
   }
 
-  function renderGraphics(data){
-    var circle_update = s.selectAll("circle.robot").data(data);
-
-    circle_update.enter()
-      .append("circle")
-      .classed("robot", true)
-      .attr("r", 15);
-    circle_update
-      .attr("cx", function(d) { return d[0]; })
-      .attr("cy", function(d) { return d[1]; })
-    circle_update.exit().remove();
-  }
-  
   function drawNextFrame(timestamp){
   //https://developer.mozilla.org/en-US/docs/Games/Anatomy
   
     window.requestAnimationFrame(drawNextFrame);
     
     startTime = startTime || timestamp;
-    simulationTime = (timestamp - startTime) / 1024;
+    simulationTime = (timestamp - startTime) / 1000;
     
+    // TODO: poll manual leader movement (gamepad/mouse)
+    
+    // update robots
     moveLeader(simulationTime);
     
-    renderGraphics(
-      [leaders[0].pos]   );
+    // run computations
+    
+    // extract state for rendering
+    renderData.leaders = leaders;
+    renderData.robots = robots;
+    renderData.simulationTime = simulationTime;
+    
+    // render simulation and visualization
+    renderer.renderGraphics(
+      renderData   );
   }
   
   // FIXME: requestAnimationFrame won't work in IE9.
   // Whether we need to support China needs to be thought 
   window.requestAnimationFrame (drawNextFrame);  
-  
-  // it wasn't clear to me that, while data in d3 is "sticky", actions aren't, 
-  // and I need to specify some action every time I update the data.
-  // (And in fact, the actions can be different every time too. )
-  // I'm not sure where did I get the incorrect idea? 
   
   // next up: make a small demo of moving stuff
 </script>
