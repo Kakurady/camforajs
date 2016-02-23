@@ -113,6 +113,9 @@
       newRobot.pos[1] += Math.sin(theta) * radius;
     }
     
+    vec3.copy(newRobot.movement.startPos, newRobot.pos);
+    vec3.copy(newRobot.movement.endPos, newRobot.pos);
+    
     robots.push(newRobot);
     renderer.addRobot(newRobot);
   }
@@ -176,9 +179,35 @@
 
   }
   /// Algorithm from Gervasi, Vincenzo and Prencipe, Giuseppe. "On the Efficient Capture of Dangerous Criminals". Third International Conference on \_ FUN with Algorithms, 2004.
-  function moveRobotGervasi2004(goal, leaders, robots, sensor, scratchpad){
+  // This algorithm isn't tweaked for perf.
+  function moveRobotGervasi2004(self, goal, leaders, robots, sensor, scratchpad){
+    var l1 = 50;
+    var E = vec3.create(); vec2.sub(E, leaders[0].pos, self.pos);
+  
+    var l = vec2.length(E);
+    var target = vec3.create(); vec3.scale(target, E, (l - l1) /l );
     
+    var cord = 2 * l1 * Math.sin( Math.PI / robots.length );
+    
+    var ri = vec3.create();
+    for (var i = 0; i < robots.length; i++){
+      var robot = robots[i]
+      if ( !robot.isSelf){
+        // you'd want to declare ri here, but this is a bad idea
+        // you're creating O( n^2 * t ) objects to be garbage collected
+        
+        vec2.sub(ri, robot.pos, self.pos);
+        var l_p = vec2.length( ri );
+        if ( l_p < cord ){
+          vec2.scaleAndAdd( target, target, ri, ( l_p - cord ) / Math.max(l_p, 0.1) );
+        }
+      }
+    }
+    
+    vec3.add(target, target, self.pos);
+    return target;
   }
+ 
 
   function init(){
     renderer = svgRenderer;
@@ -194,6 +223,8 @@
   function drawNextFrame(timestamp){
   //https://developer.mozilla.org/en-US/docs/Games/Anatomy
     var i; var j;
+    // FIXME perf 
+    var howfar = vec3.create();
   
     window.requestAnimationFrame(drawNextFrame);
     
@@ -204,10 +235,20 @@
     
     // update robots
     moveLeader(simulationTime);
+    for (i = 0; i < robots.length; i++){
+      var robot = robots[i];
+      vec3.lerp(
+        robot.pos, 
+        robot.movement.startPos, 
+        robot.movement.endPos, 
+        Math.min(1, (simulationTime - robot.movement.startTime) / (robot.movement.endTime - robot.movement.startTime) )
+      );
+    }
     
     // run computations
     for (i = 0; i < robots.length; i++){
       var robot = robots[i];
+      var self;
       // 1. find robots that need computations run
       if (simulationTime >= robot.movement.endTime){
         // 2. gather state and run sensing filters/plugins
@@ -224,9 +265,11 @@
           sensed.leaders.push({
             pos: vec3.create()
           });
+          // TODO hook: init coordinate transformation
         }
         for (j = 0; j < leaders.length; j++) {
           vec3.copy(sensed.leaders[j].pos, leaders[j].pos);
+          // TODO hook: apply coordinate transformation
         }
         
         if (robots.length < sensed.robots.length) {
@@ -242,12 +285,27 @@
         for (j = 0; j < robots.length; j++) {
           vec3.copy(sensed.robots[j].pos, robots[j].pos);
           sensed.robots[j].isSelf = (i == j);
+          
+          if (i == j) { self = sensed.robots[j]; }
         }
         // 3. run algorithm
+        // ( instead of passing self, I could invoke the method on the `self` object so it becomes `this` )
+        // FIXME handle returning different dimensions
         // FIXME perf: creates garbage for GC to clean up 
-        moveRobots(robot.goal, sensed.leaders, sensed.robots, sensed, robot.scratchpad);
-        // 4. update result
+        robot.goal = moveRobots(self, robot.goal, sensed.leaders, sensed.robots, sensed, robot.scratchpad);
       
+        // 4. update result
+        // set new start position and time
+        
+        vec3.copy(robot.movement.startPos, robot.pos);
+        robot.movement.startTime = simulationTime;
+        
+        vec3.copy(robot.movement.endPos, robot.goal);
+        vec3.sub(howfar, robot.pos, robot.goal);
+        var duration = vec3.length(howfar) / robot.speed;
+        robot.movement.endTime = robot.movement.startTime + duration;
+      
+        // TODO hook: if robot is disabled, don't move it
       }
     }
     
@@ -257,8 +315,7 @@
     renderData.simulationTime = simulationTime;
     
     // render simulation and visualization
-    renderer.renderGraphics(
-      renderData   );
+    renderer.renderGraphics( renderData );
   }
   
   init();
