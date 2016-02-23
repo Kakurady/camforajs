@@ -18,7 +18,7 @@
   var circle_selection = s.selectAll("circle");
   
   function renderGraphics(data){
-    var circle_update = circle_selection.data(data);
+    var circle_update = s.selectAll("circle").data(data);
 
     circle_update.enter()
       .append("circle")
