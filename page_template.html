@@ -17,15 +17,15 @@
   var leaders = [
     { 
       // question: 2-axis, 3-axis, or homogenous coordinates?
-      pos: [400, 240, 0],
+      pos: vec3.fromValues(400, 240, 0),
       /// max movement speed, in pixels per second.
       speed:  200,
       
       // currently assuming zero turning radius... zero minimum movement distance
       // implementation-specific? ( will need to be rebuilt for robots )
-      movementStartPos: [0, 0, 0],
+      movementStartPos: vec3.create(),
       movementStartTime: -1,
-      movementEndPos: [0, 0, 0],
+      movementEndPos: vec3.create(),
       movementEndTime: 0
     }
   ];
@@ -46,6 +46,10 @@
   }
   
   var rendererOptions = {};
+  var renderer;
+  
+  var moveRobots;
+    
   var svgRenderer = (function makeSVGRenderer( options ){
     // our canvas element. a d3 selection containing one (1) svg element
     var s = d3.select("body").append("svg");
@@ -83,7 +87,37 @@
     };
   })( rendererOptions );
   
-  var renderer = svgRenderer;
+  function addRobot( options ){
+    var newRobot = {
+      pos: vec3.create(),
+      speed: 250,
+      movement: {
+        startPos: vec3.create(),
+        startTime: simulationTime-1,
+        endPos: vec3.create(),
+        endTime: simulationTime
+      },
+      goal: vec3.create(),
+      sensed: { leaders: [], robots: [] },
+      scratchpad: {}
+    }    
+    if (options && options.pos){
+      vec3.copy(newRobot.pos, options.pos);
+    } else {
+      vec3.copy(newRobot.pos, leaders[0].pos);
+      
+      var radius = Math.random() * 200 + 200;
+      var theta = Math.random() * Math.PI * 2;
+      
+      newRobot.pos[0] += Math.cos(theta) * radius;
+      newRobot.pos[1] += Math.sin(theta) * radius;
+    }
+    
+    robots.push(newRobot);
+    renderer.addRobot(newRobot);
+  }
+  
+  
   
   // FIXME HACK making sure the leader starts at its position (need better method for robots)
   vec3.copy (leaders[0].movementEndPos, leaders[0].pos);
@@ -141,9 +175,25 @@
     
 
   }
+  /// Algorithm from Gervasi, Vincenzo and Prencipe, Giuseppe. "On the Efficient Capture of Dangerous Criminals". Third International Conference on \_ FUN with Algorithms, 2004.
+  function moveRobotGervasi2004(goal, leaders, robots, sensor, scratchpad){
+    
+  }
+
+  function init(){
+    renderer = svgRenderer;
+    moveRobots = moveRobotGervasi2004;
+    
+    var numRobots = Math.ceil( 2 + Math.random()*5 );
+    var i;
+    for (i = 0; i < numRobots; i++){
+      addRobot();
+    }
+  }
 
   function drawNextFrame(timestamp){
   //https://developer.mozilla.org/en-US/docs/Games/Anatomy
+    var i; var j;
   
     window.requestAnimationFrame(drawNextFrame);
     
@@ -156,6 +206,50 @@
     moveLeader(simulationTime);
     
     // run computations
+    for (i = 0; i < robots.length; i++){
+      var robot = robots[i];
+      // 1. find robots that need computations run
+      if (simulationTime >= robot.movement.endTime){
+        // 2. gather state and run sensing filters/plugins
+        // FIXME perf: creates temporary objects
+        var sensed = robot.sensed;
+        
+        // update items
+        // truncate the array if it's too long
+        if (leaders.length < sensed.leaders.length) {
+          sensed.leaders.length = leaders.length;
+        }
+        // add new items if it's too short
+        for (j = sensed.leaders.length; j < leaders.length; j++){
+          sensed.leaders.push({
+            pos: vec3.create()
+          });
+        }
+        for (j = 0; j < leaders.length; j++) {
+          vec3.copy(sensed.leaders[j].pos, leaders[j].pos);
+        }
+        
+        if (robots.length < sensed.robots.length) {
+          sensed.robots.length = robots.length;
+        }
+        // add new items if it's too short
+        for (j = sensed.robots.length; j < robots.length; j++){
+          sensed.robots.push({
+            pos: vec3.create(),
+            isSelf : false
+          });
+        }
+        for (j = 0; j < robots.length; j++) {
+          vec3.copy(sensed.robots[j].pos, robots[j].pos);
+          sensed.robots[j].isSelf = (i == j);
+        }
+        // 3. run algorithm
+        // FIXME perf: creates garbage for GC to clean up 
+        moveRobots(robot.goal, sensed.leaders, sensed.robots, sensed, robot.scratchpad);
+        // 4. update result
+      
+      }
+    }
     
     // extract state for rendering
     renderData.leaders = leaders;
@@ -167,6 +261,7 @@
       renderData   );
   }
   
+  init();
   // FIXME: requestAnimationFrame won't work in IE9.
   // Whether we need to support China needs to be thought 
   window.requestAnimationFrame (drawNextFrame);  
