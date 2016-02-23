@@ -41,23 +41,49 @@
   s.attr("width", 800);
   s.attr("height", 480);
 
+  // FIXME HACK making sure the leader starts at its position (need better method for robots)
+  vec3.copy (leaders[0].movementEndPos, leaders[0].pos);
   function moveLeader(simulationTime){
     var leader = leaders[0];
     
+    // every frame: interpolate current position
+    // (  the idea is that we pretend computations happens in an instant,
+    //    that is, at the current `simulationTime`.
+    //    and movements happen over an interval, that is, between the last
+    //    `simulationTime` and the current `simulationTime`. (this is called a
+    //    _frame_ when running in realtime, as used in video games, because
+    //    each update result in one image being displayed.)
+    //    so the position calculation is used to "catch up" the simulation
+    //    to the instant when computations happen.
+    //    this way, when a robot finishes its _MOVE_ phrase, it can begin
+    //    the _LOOK_ and _COMPUTE_ phrase in the same frame, making a smoother-
+    //    looking simulation.
+    //
+    //    if we run the position update after the computation, then a robot that
+    //    finished _MOVE_ment between instants `t-1` and `t` would not start its
+    //    _COMPUTE_ phrase until `t+1`.
+    //    it's possible to get around this by making the animation start time
+    //    before the compute instant, but this effectively makes robots being
+    //    able to see into the future.
+    //  )
     vec3.lerp(
       leader.pos, 
       leader.movementStartPos, 
       leader.movementEndPos, 
-      (simulationTime - leader.movementStartTime) / (leader.movementEndTime - leader.movementStartTime)
-    );
+      Math.min(1, (simulationTime - leader.movementStartTime) / (leader.movementEndTime - leader.movementStartTime) )
+      );
     
     if (simulationTime >= leader.movementEndTime){
       // FIXME perf: creates garbage
       var offset = vec3.fromValues(400, 240, 0);
       var howfar = vec3.create();
       
+      // set new start position and time
+      
       vec3.copy(leader.movementStartPos, leader.pos);
       leader.movementStartTime = simulationTime;
+      
+      // set new end position and time
       
       vec2.random(leader.movementEndPos, 240);
       vec3.add(leader.movementEndPos, leader.movementEndPos, offset);
@@ -69,6 +95,7 @@
       leader.movementEndTime = leader.movementStartTime + duration;
     }
     
+
   }
 
   function renderGraphics(data){
