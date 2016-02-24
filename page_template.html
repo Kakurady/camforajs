@@ -44,7 +44,7 @@
   var renderData = {
     leaders: leaders,
     robots: robots
-  }
+  };
   
   var rendererOptions = {};
   var renderer;
@@ -94,7 +94,7 @@
         .attr("r", 15);
       leader_update
         .attr("cx", function(d) { return d.pos[0]; })
-        .attr("cy", function(d) { return d.pos[1]; })
+        .attr("cy", function(d) { return d.pos[1]; });
       leader_update.exit().remove();
       
       var robot_update = plot.selectAll("circle.robot").data(data.robots);
@@ -125,12 +125,12 @@
         });
       robot_update
         .attr("cx", function(d) { return d.pos[0]; })
-        .attr("cy", function(d) { return d.pos[1]; })
+        .attr("cy", function(d) { return d.pos[1]; });
       robot_update.exit().remove();
     }
     
     return {
-      addRobot: function addRobot(){ ; },
+      addRobot: function addRobot(){},
       attachedElement: s,
       init: init,
       renderGraphics: renderGraphics
@@ -150,7 +150,7 @@
       goal: vec3.create(),
       sensed: { leaders: [], robots: [] },
       scratchpad: {}
-    }    
+    };
     if (options && options.pos){
       vec3.copy(newRobot.pos, options.pos);
     } else {
@@ -241,7 +241,7 @@
     
     var ri = vec3.create();
     for (var i = 0; i < robots.length; i++){
-      var robot = robots[i]
+      var robot = robots[i];
       if ( !robot.isSelf){
         // you'd want to declare ri here, but this is a bad idea
         // you're creating O( n^2 * t ) objects to be garbage collected
@@ -282,6 +282,7 @@
     var i; var j;
     // FIXME perf 
     var howfar = vec3.create();
+    var robot;
   
     window.requestAnimationFrame(drawNextFrame);
     
@@ -293,7 +294,8 @@
     // update robots
     moveLeader(simulationTime);
     for (i = 0; i < robots.length; i++){
-      var robot = robots[i];
+      // TODO could be using `let` here
+      robot = robots[i];
       vec3.lerp(
         robot.pos, 
         robot.movement.startPos, 
@@ -304,7 +306,8 @@
     
     // run computations
     for (i = 0; i < robots.length; i++){
-      var robot = robots[i];
+      // TODO could be using `let` here
+      robot = robots[i];
       var self;
       // 1. find robots that need computations run
       if (simulationTime >= robot.movement.endTime){
