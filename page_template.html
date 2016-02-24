@@ -8,8 +8,9 @@
   <script src="ext/gl-matrix/gl-matrix.js" charset="utf-8"></script>
 
 <body>
+<button id="add-robot-button" disabled>Add Robot</button>
 
-<!-- run after the DOM is ready  -->
+<!-- FIXME run after the DOM is ready  -->
 <script type="text/javascript">
   glMatrix.setMatrixArrayType(Array);
   
@@ -52,12 +53,30 @@
     
   var svgRenderer = (function makeSVGRenderer( options ){
     // our canvas element. a d3 selection containing one (1) svg element
-    var s = d3.select("body").append("svg");
-    s.attr("width", 800);
-    s.attr("height", 480);
+    var s;
+    // container group for all our drawings. 
+    var plot;
     // number of robots initially present, for assigning colors
     // FIXME: if starts out paused, should't count
     var n = 0;
+    var color = vec3.create();
+    var zoom;
+    
+    function init(){
+      s = d3.select("body").insert("svg");
+      s.attr("width", 800);
+      s.attr("height", 480);
+      
+      plot = s.insert("g").attr("id", "plot");
+    
+      zoom = d3.behavior.zoom();
+      s.call(zoom);
+      
+      zoom.on("zoom", function onZoom(){
+        e = d3.event;
+        plot.attr("transform", "translate("+ e.translate[0] +" "+ e.translate[1] + ") scale("+ e.scale + ")");
+      });
+    }
   
     function tog(out, t){
       out[0] = ( Math.cos(  t * 2 * Math.PI) + 1 ) / 2;
@@ -66,25 +85,26 @@
     }
   
     function renderGraphics(data){
-      var leader_update = s.selectAll("circle.leader").data(data.leaders);
-      var color = vec3.create();
+      var leader_update = plot.selectAll("circle.leader").data(data.leaders);
 
       leader_update.enter()
         .append("circle")
         .classed("leader", true)
+        .attr("id", function (d, i) { return "leader-"+i; })
         .attr("r", 15);
       leader_update
         .attr("cx", function(d) { return d.pos[0]; })
         .attr("cy", function(d) { return d.pos[1]; })
       leader_update.exit().remove();
       
-      var robot_update = s.selectAll("circle.robot").data(data.robots);
+      var robot_update = plot.selectAll("circle.robot").data(data.robots);
       n = n || data.robots.length;
 
       robot_update.enter()
         .append("circle")
         .classed("robot", true)
-        .attr("r", 10)
+        .attr("id", function (d, i) { return "robot-"+i; })
+        .attr("r", 10)        
         .attr("style", function(d, i){
           if (i < n){
             tog(color, i / ( data.robots.length + 2) );
@@ -110,9 +130,10 @@
     }
     
     return {
+      addRobot: function addRobot(){ ; },
       attachedElement: s,
-      renderGraphics: renderGraphics,
-      addRobot: function addRobot(){ ; }
+      init: init,
+      renderGraphics: renderGraphics
     };
   })( rendererOptions );
   
@@ -242,11 +263,18 @@
     renderer = svgRenderer;
     moveRobots = moveRobotGervasi2004;
     
+    renderer.init();
+    
     var numRobots = Math.ceil( 2 + Math.random()*5 );
     var i;
     for (i = 0; i < numRobots; i++){
       addRobot();
     }
+    
+    d3.select("#add-robot-button").attr("disabled", null)
+      .on("click", function(){
+        addRobot();
+      });
   }
 
   function drawNextFrame(timestamp){
