@@ -7,6 +7,13 @@
   <script src="ext/d3/d3.js" charset="utf-8"></script>
   <script src="ext/gl-matrix/gl-matrix.js" charset="utf-8"></script>
 
+  <style type="text/css">
+  /*  */
+  .axis line, .axis path {
+    fill: none;
+    stroke: black;
+  }
+  </style>
 <body>
 <button id="add-robot-button" disabled>Add Robot</button>
 
@@ -60,21 +67,57 @@
     // FIXME: if starts out paused, should't count
     var n = 0;
     var color = vec3.create();
+    
     var zoom;
+    var xScale;
+    var yScale;
+    var xAxis;
+    var yAxis;
+    var xAxisGroup;
+    var yAxisGroup;
+    var zoomTranslation = vec3.create();
     
     function init(){
       s = d3.select("body").insert("svg");
       s.attr("width", 800);
       s.attr("height", 480);
       
+      // fixme: default is 6px + 0.71em
+      xAxisGroup = s.insert("g")
+        .attr("class", "axis x-axis")
+        .attr("id", "x-axis").attr("transform", "translate(0 "+ (480 - 25 - 0.5) +")");
+      yAxisGroup = s.insert("g")
+        .attr("class", "axis y-axis")
+        .attr("id", "y-axis").attr("transform", "translate("+ ( 50 - 0.5)  +" 0)");
       plot = s.insert("g").attr("id", "plot");
+      
+      xScale = d3.scale.linear()
+        .domain([0, 800])
+        .range([0, 800]);
+      yScale = d3.scale.linear()
+        .domain([0, 480])
+        .range([0, 480]);
+      
+      xAxis = d3.svg.axis()
+        .scale(xScale)
+        .orient("bottom");
+      xAxisGroup.call(xAxis);
+      
+      yAxis = d3.svg.axis()
+        .scale(yScale)
+        .orient("left");
+      yAxisGroup.call(yAxis);
     
-      zoom = d3.behavior.zoom();
+      zoom = d3.behavior.zoom()
+        .x(xScale)
+        .y(yScale);
       s.call(zoom);
       
       zoom.on("zoom", function onZoom(){
         e = d3.event;
         plot.attr("transform", "translate("+ e.translate[0] +" "+ e.translate[1] + ") scale("+ e.scale + ")");
+        xAxisGroup.call(xAxis);
+        yAxisGroup.call(yAxis);
       });
     }
   
@@ -127,6 +170,15 @@
         .attr("cx", function(d) { return d.pos[0]; })
         .attr("cy", function(d) { return d.pos[1]; });
       robot_update.exit().remove();
+      
+      if (data.leaders[0]){
+        vec3.negate(zoomTranslation, data.leaders[0].pos);
+        zoomTranslation[0] += 400;
+        zoomTranslation[1] += 240;
+        zoom.translate(zoomTranslation);
+        
+        zoom.event(s);
+      }
     }
     
     return {
