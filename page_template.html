@@ -13,9 +13,23 @@
     fill: none;
     stroke: black;
   }
+  
+  #wrapper {
+    position:absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+  }
+  
+  .camfora-wrapper {
+    width: 100%;
+    height: 100%;
+  }
   </style>
 <body>
 <button id="add-robot-button" disabled>Add Robot</button>
+<div id="wrapper"></div>
 
 <!-- FIXME run after the DOM is ready  -->
 <script type="text/javascript">
@@ -25,7 +39,7 @@
   var leaders = [
     { 
       // question: 2-axis, 3-axis, or homogenous coordinates?
-      pos: vec3.fromValues(400, 240, 0),
+      pos: vec3.fromValues(0, 0, 0),
       /// max movement speed, in pixels per second.
       speed:  200,
       
@@ -57,8 +71,16 @@
   var renderer;
   
   var moveRobots;
+  
+  // this should go into the ui module
+  var needResizeCanvas = false;
+  var needResetStartTime = false;
+  
+  var animationFrameScheduled = true;
     
   var svgRenderer = (function makeSVGRenderer( options ){
+    var rootElement;
+    var wrapper;
     // our canvas element. a d3 selection containing one (1) svg element
     var s;
     // container group for all our drawings. 
@@ -76,11 +98,55 @@
     var xAxisGroup;
     var yAxisGroup;
     var zoomTranslation = vec3.create();
+
+    var canvasWidth = 800;
+    var canvasHeight = 480;    
+    var plotWidth = canvasWidth;
+    var plotHeight = canvasHeight;
+    
+    function onResize(){
+      needResizeCanvas = true;
+      if (!animationFrameScheduled) {
+        window.requestAnimationFrame(drawNextFrame);
+      }
+    }
+    // private 
+    function resizeCanvas(){
+        canvasWidth = wrapper.property("clientWidth");
+        canvasHeight = wrapper.property("clientHeight");
+        plotWidth = canvasWidth - 5;
+        plotHeight = canvasHeight - 5;
+        
+        s.attr("width", plotWidth);
+        s.attr("height", plotHeight);
+        xAxisGroup.attr("transform", "translate(0 "+ (plotHeight - 25 - 0.5) +")");
+        yAxisGroup.attr("transform", "translate("+ ( 50 - 0.5)  +" 0)");
+        
+        zoom.size(plotWidth, plotHeight);
+        var oldScale = zoom.scale();
+        var oldTranslate = zoom.translate();
+        xScale.domain([ 0, plotWidth ]);
+        xScale.range([0, plotWidth]);
+        yScale.domain([0, plotHeight]);
+        yScale.range([0, plotHeight]);
+        xAxis.innerTickSize(-plotHeight);
+        yAxis.innerTickSize(-plotWidth);
+        zoom.x(xScale);
+        zoom.y(yScale);
+        zoom.scale(oldScale);
+        zoom.translate(oldTranslate);
+        zoom.event(s);
+    }
     
     function init(){
-      s = d3.select("body").insert("svg");
-      s.attr("width", 800);
-      s.attr("height", 480);
+      wrapper = d3.select("#wrapper").insert("div");
+      wrapper.classed("camfora-wrapper", true);
+      s = wrapper.insert("svg");
+      s.attr("width", plotWidth);
+      s.attr("height", plotHeight);
+      s.classed("camfora-plot", true);
+      
+      d3.select(document.defaultView).on("resize.resizeCanvas", onResize);
       
       // fixme: default is 6px + 0.71em
       xAxisGroup = s.insert("g")
@@ -119,15 +185,22 @@
         xAxisGroup.call(xAxis);
         yAxisGroup.call(yAxis);
       });
+      resizeCanvas();
     }
   
     function tog(out, t){
       out[0] = ( Math.cos(  t * 2 * Math.PI) + 1 ) / 2;
       out[1] = ( Math.cos( (t * 2 + 2 / 3) * Math.PI ) + 1 ) / 2;
       out[2] = ( Math.cos( (t * 2 + 4 / 3) * Math.PI ) + 1 ) / 2;
+      console.log(out, t);
     }
   
     function renderGraphics(data){
+      if (needResizeCanvas){
+        resizeCanvas();
+        needResizeCanvas = false;
+      }
+    
       var leader_update = plot.selectAll("circle.leader").data(data.leaders);
 
       leader_update.enter()
@@ -153,8 +226,10 @@
             tog(color, i / ( data.robots.length + 2) );
           } else {
             var k = Math.floor(i/n);
-            var added = ( ( 2 * k - 1) / Math.pow(2, Math.ceil( Math.log(k) / Math.LN2 ) + 1 )) % 1;
-            console.log(k, added);
+            var num = ( 2 * k + 1);
+            var dem = Math.pow(2, Math.ceil( Math.log(k + 1) / Math.LN2 ));
+            var added = ( num / dem ) % 1;
+            console.log(k, num, dem, added);
             tog(color, (i % n + added) / ( n + 2) );
           }
           vec3.scale( color, color, 100);
@@ -173,8 +248,9 @@
       
       if (data.leaders[0]){
         vec3.negate(zoomTranslation, data.leaders[0].pos);
-        zoomTranslation[0] += 400;
-        zoomTranslation[1] += 240;
+        vec3.scale(zoomTranslation, zoomTranslation, zoom.scale());
+        zoomTranslation[0] += plotWidth / 2;
+        zoomTranslation[1] += plotHeight / 2;
         zoom.translate(zoomTranslation);
         
         zoom.event(s);
@@ -258,7 +334,7 @@
     
     if (simulationTime >= leader.movementEndTime){
       // FIXME perf: creates garbage that needs to be collected
-      var offset = vec3.fromValues(400, 240, 0);
+      var offset = vec3.fromValues(0, 0, 0);
       var howfar = vec3.create();
       
       // set new start position and time
@@ -268,7 +344,7 @@
       
       // set new end position and time
       
-      vec2.random(leader.movementEndPos, 240);
+      vec2.random(leader.movementEndPos, 400);
       vec3.add(leader.movementEndPos, leader.movementEndPos, offset);
       // figure out the animation end time
       vec3.sub(howfar, leader.pos, leader.movementEndPos);
