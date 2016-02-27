@@ -192,7 +192,6 @@
       out[0] = ( Math.cos(  t * 2 * Math.PI) + 1 ) / 2;
       out[1] = ( Math.cos( (t * 2 + 2 / 3) * Math.PI ) + 1 ) / 2;
       out[2] = ( Math.cos( (t * 2 + 4 / 3) * Math.PI ) + 1 ) / 2;
-      console.log(out, t);
     }
   
     function renderGraphics(data){
@@ -229,7 +228,6 @@
             var num = ( 2 * k + 1);
             var dem = Math.pow(2, Math.ceil( Math.log(k + 1) / Math.LN2 ));
             var added = ( num / dem ) % 1;
-            console.log(k, num, dem, added);
             tog(color, (i % n + added) / ( n + 2) );
           }
           vec3.scale( color, color, 100);
