@@ -9,11 +9,6 @@
   <script src="ext/gl-matrix/gl-matrix.js" charset="utf-8"></script>
 
   <style type="text/css">
-  /*  */
-  .axis line, .axis path {
-    fill: none;
-    stroke: black;
-  }
   
   #wrapper {
     position:absolute;
@@ -27,14 +22,25 @@
     width: 100%;
     height: 100%;
   }
+
+  /* plot css */
+  .axis line, .axis path {
+    fill: none;
+    stroke: black;
+  }
   
-  /* css */
   .robot {
     fill: currentColor;
   }
   
   .goal {
     fill: currentColor;
+    stroke: black;
+    stroke-width: 1px;
+  }
+  
+  .trail {
+    fill: none;
     stroke: black;
     stroke-width: 1px;
   }
@@ -59,10 +65,12 @@
       
       // currently assuming zero turning radius... zero minimum movement distance
       // implementation-specific? ( will need to be rebuilt for robots )
-      movementStartPos: vec3.create(),
-      movementStartTime: -1,
-      movementEndPos: vec3.create(),
-      movementEndTime: 0
+      movement: {
+        startPos: vec3.create(),
+        startTime: -1,
+        endPos: vec3.create(),
+        endTime: 0
+      }
     }
   ];
   
@@ -91,7 +99,9 @@
   var needResetStartTime = false;
   
   var animationFrameScheduled = true;
-    
+  
+  var maxPoints = 25;
+  
   var svgRenderer = (function makeSVGRenderer( options ){
     var rootElement;
     var wrapper;
@@ -117,6 +127,9 @@
     var canvasHeight = 480;    
     var plotWidth = canvasWidth;
     var plotHeight = canvasHeight;
+    
+    var trailData = [];
+
     
     function onResize(){
       needResizeCanvas = true;
@@ -227,8 +240,27 @@
         Math.round(color[2]), "% )"
         ].join("");
     }
+    
+    // FIXME produce trails that are relative to the center
+    function buildPathAttr(d, i){
+      var stringBuf = "";
+      var j = 0;
+      stringBuf = stringBuf + "M" + d[j].endPos[0].toString() + " " + d[j].endPos[1].toString();
+      for (j = 1; j < d.length; j++){
+        stringBuf = stringBuf + "L" + d[j].endPos[0].toString() + " " + d[j].endPos[1].toString();
+      }
+      return stringBuf;
+    }
+    
+    function returnNewArray(){ return []; }
   
     function renderGraphics(data){
+      // FIXME perf: creating functions like candy here. They all have to be GC'ed.
+      var i = 0;
+      var j = 0;
+      var robot;
+      var trailEntry;
+
       if (needResizeCanvas){
         resizeCanvas();
         needResizeCanvas = false;
@@ -262,6 +294,7 @@
         .attr("cy", function(d) { return d.pos[1]; });
       robot_update.exit().remove();
       
+      // drawing goals.
       var goal_update = plot.selectAll("circle.goal").data(data.robots);
       
       goal_update.enter()
@@ -274,6 +307,43 @@
         .attr("cx", function(d) { return d.goal[0]; })
         .attr("cy", function(d) { return d.goal[1]; });
       goal_update.exit().remove();
+      
+      //  drawing trails. 
+      //  update trail array-of-array.
+      setArrayLength(trailData, robots.length, returnNewArray);
+      for(i = 0; i < robots.length; i++){
+        robot = robots[i];
+        j = 0;
+        while (j < robot.trail.length){
+      //  in each subarray
+      //    do:
+      //      see if array is too short for next element
+          if( j >= trailData[i].length) {
+      //        if yes, add new element
+            trailData[i].push({ endPos: vec3.create(), endTime: 0 });
+          }
+      //      calculate new element
+          trailEntry = trailData[i][j];
+          trailEntry.endTime = robot.trail[j].endTime;
+          vec3.copy(trailEntry.endPos, robot.trail[j].endPos);          
+          j++;
+      //    until no more element needed
+          
+        }
+        trailData[i].length = robot.trail.length;
+      //    trim subarray to size.
+      }
+      
+      var trail_update = plot.selectAll("path.trail").data(trailData);
+      trail_update.enter()
+        .append("path")
+        .classed("trail", true)
+        .attr("id", function (d, i) { return "trail-"+i; })
+        .attr("style", paintColor);
+      trail_update
+        .attr("d", buildPathAttr);
+      trail_update.exit().remove();
+
       
       // focus camera on leader.
       // FIXME: something about disabling panning
@@ -308,7 +378,8 @@
       },
       goal: vec3.create(),
       sensed: { leaders: [], robots: [] },
-      scratchpad: {}
+      scratchpad: {},
+      trail: []
     };
     if (options && options.pos){
       vec3.copy(newRobot.pos, options.pos);
@@ -325,6 +396,11 @@
     vec3.copy(newRobot.movement.startPos, newRobot.pos);
     vec3.copy(newRobot.movement.endPos, newRobot.pos);
     
+    newRobot.trail.push({
+      endPos: vec3.clone(newRobot.movement.endPos),
+      endTime: newRobot.movement.endTime
+    });
+    
     robots.push(newRobot);
     renderer.addRobot(newRobot);
   }
@@ -332,7 +408,7 @@
   
   
   // FIXME HACK making sure the leader starts at its position (need better method for robots)
-  vec3.copy (leaders[0].movementEndPos, leaders[0].pos);
+  vec3.copy (leaders[0].movement.endPos, leaders[0].pos);
   function moveLeader(simulationTime){
     var leader = leaders[0];
     
@@ -358,31 +434,31 @@
     //  )
     vec3.lerp(
       leader.pos, 
-      leader.movementStartPos, 
-      leader.movementEndPos, 
-      Math.min(1, (simulationTime - leader.movementStartTime) / (leader.movementEndTime - leader.movementStartTime) )
+      leader.movement.startPos, 
+      leader.movement.endPos, 
+      Math.min(1, (simulationTime - leader.movement.startTime) / (leader.movement.endTime - leader.movement.startTime) )
       );
     
-    if (simulationTime >= leader.movementEndTime){
+    if (simulationTime >= leader.movement.endTime){
       // FIXME perf: creates garbage that needs to be collected
       var offset = vec3.fromValues(0, 0, 0);
       var howfar = vec3.create();
       
       // set new start position and time
       
-      vec3.copy(leader.movementStartPos, leader.pos);
-      leader.movementStartTime = simulationTime;
+      vec3.copy(leader.movement.startPos, leader.pos);
+      leader.movement.startTime = simulationTime;
       
       // set new end position and time
       
-      vec2.random(leader.movementEndPos, 400);
-      vec3.add(leader.movementEndPos, leader.movementEndPos, offset);
+      vec2.random(leader.movement.endPos, 400);
+      vec3.add(leader.movement.endPos, leader.movement.endPos, offset);
       // figure out the animation end time
-      vec3.sub(howfar, leader.pos, leader.movementEndPos);
+      vec3.sub(howfar, leader.pos, leader.movement.endPos);
       var duration = vec2.length(howfar) / leader.speed;
       // set a random speed
       duration = duration * ( 0.5 + Math.random(0.5) );
-      leader.movementEndTime = leader.movementStartTime + duration;
+      leader.movement.endTime = leader.movement.startTime + duration;
     }
     
 
@@ -435,7 +511,19 @@
         addRobot();
       });
   }
-
+  
+  function setArrayLength(to, targetLength, newFunc){
+    var j;
+    
+    // trim to array if it's too long
+    if (targetLength < to.length) {
+      to.length = targetLength;
+    }
+    // add new entries if it's too short
+    for (j = to.length; j < targetLength; j++){
+      to.push( newFunc(j) );
+    }
+  }
   function drawNextFrame(timestamp){
   //https://developer.mozilla.org/en-US/docs/Games/Anatomy
     var i; var j;
@@ -523,6 +611,15 @@
         vec3.sub(howfar, robot.pos, robot.goal);
         var duration = vec3.length(howfar) / robot.speed;
         robot.movement.endTime = robot.movement.startTime + duration;
+        
+        robot.trail.push({
+          endTime: robot.movement.endTime,
+          endPos:  vec3.clone(robot.movement.endPos)
+        });
+        while (robot.trail.length > maxPoints){
+          robot.trail.shift();
+        }
+        
       
         // TODO hook: if robot is disabled, don't move it
       }
