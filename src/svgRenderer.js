@@ -1,4 +1,25 @@
 // -*- indent-tabs-mode:nil; tab-width: 2; -*- 
+import {setArrayLength} from "./util";
+
+function tog(out, t){
+  out[0] = ( Math.cos(  t * 2 * Math.PI) + 1 ) / 2;
+  out[1] = ( Math.cos( (t * 2 + 2 / 3) * Math.PI ) + 1 ) / 2;
+  out[2] = ( Math.cos( (t * 2 + 4 / 3) * Math.PI ) + 1 ) / 2;
+}
+
+
+// FIXME produce trails that are relative to the center
+function buildPathAttr(d, i){
+  var stringBuf = "";
+  var j = 0;
+  stringBuf = stringBuf + "M" + d[j].endPos[0].toString() + " " + d[j].endPos[1].toString();
+  for (j = 1; j < d.length; j++){
+    stringBuf = stringBuf + "L" + d[j].endPos[0].toString() + " " + d[j].endPos[1].toString();
+  }
+  return stringBuf;
+}
+
+function returnNewArray(){ return []; }
 
 function makeSVGRenderer( options ){
     var rootElement;
@@ -28,14 +49,20 @@ function makeSVGRenderer( options ){
     
     var trailData = [];
 
+    // this should go into the ui module
+    var needResizeCanvas = false;
+    var needResetStartTime = false;
     
+    // callback when containing element is resized; schedules resizing.
     function onResize(){
       needResizeCanvas = true;
-      if (!animationFrameScheduled) {
-        window.requestAnimationFrame(drawNextFrame);
-      }
+      // TODO have the render call into the core
+      //if (!animationFrameScheduled) {
+      //  window.requestAnimationFrame(drawNextFrame);
+      //}
     }
     // private 
+    // actually does the resizing. avoids running code multiple times in a frame.
     function resizeCanvas(){
         canvasWidth = wrapper.property("clientWidth");
         canvasHeight = wrapper.property("clientHeight");
@@ -61,6 +88,27 @@ function makeSVGRenderer( options ){
         zoom.scale(oldScale);
         zoom.translate(oldTranslate);
         zoom.event(s);
+    }
+    
+    // this function needs a reference to n.
+    function paintColor(d, i){
+      if (i < n){
+        tog(color, i / ( n + 2) );
+      } else {
+        var k = Math.floor(i/n);
+        var num = ( 2 * k + 1);
+        var dem = Math.pow(2, Math.ceil( Math.log(k + 1) / Math.LN2 ));
+        var added = ( num / dem ) % 1;
+        tog(color, (i % n + added) / ( n + 2) );
+      }
+      vec3.scale( color, color, 100);
+      
+      return [
+        "color:rgb( ", 
+        Math.round(color[0]), "%,", 
+        Math.round(color[1]), "%,",
+        Math.round(color[2]), "% )"
+        ].join("");
     }
     
     function init(){
@@ -114,46 +162,7 @@ function makeSVGRenderer( options ){
       });
       resizeCanvas();
     }
-  
-    function tog(out, t){
-      out[0] = ( Math.cos(  t * 2 * Math.PI) + 1 ) / 2;
-      out[1] = ( Math.cos( (t * 2 + 2 / 3) * Math.PI ) + 1 ) / 2;
-      out[2] = ( Math.cos( (t * 2 + 4 / 3) * Math.PI ) + 1 ) / 2;
-    }
-  
-    function paintColor(d, i){
-      if (i < n){
-        tog(color, i / ( n + 2) );
-      } else {
-        var k = Math.floor(i/n);
-        var num = ( 2 * k + 1);
-        var dem = Math.pow(2, Math.ceil( Math.log(k + 1) / Math.LN2 ));
-        var added = ( num / dem ) % 1;
-        tog(color, (i % n + added) / ( n + 2) );
-      }
-      vec3.scale( color, color, 100);
-      
-      return [
-        "color:rgb( ", 
-        Math.round(color[0]), "%,", 
-        Math.round(color[1]), "%,",
-        Math.round(color[2]), "% )"
-        ].join("");
-    }
-    
-    // FIXME produce trails that are relative to the center
-    function buildPathAttr(d, i){
-      var stringBuf = "";
-      var j = 0;
-      stringBuf = stringBuf + "M" + d[j].endPos[0].toString() + " " + d[j].endPos[1].toString();
-      for (j = 1; j < d.length; j++){
-        stringBuf = stringBuf + "L" + d[j].endPos[0].toString() + " " + d[j].endPos[1].toString();
-      }
-      return stringBuf;
-    }
-    
-    function returnNewArray(){ return []; }
-  
+
     function renderGraphics(data){
       // FIXME perf: creating functions like candy here. They all have to be GC'ed.
       var i = 0;
@@ -210,9 +219,9 @@ function makeSVGRenderer( options ){
       
       //  drawing trails. 
       //  update trail array-of-array.
-      setArrayLength(trailData, robots.length, returnNewArray);
-      for(i = 0; i < robots.length; i++){
-        robot = robots[i];
+      setArrayLength(trailData, data.robots.length, returnNewArray);
+      for(i = 0; i < data.robots.length; i++){
+        robot = data.robots[i];
         j = 0;
         while (j < robot.trail.length){
       //  in each subarray

@@ -1,5 +1,36 @@
 // -*- indent-tabs-mode:nil; tab-width: 2; -*- 
 import svgRenderer from "./svgRenderer";
+import {setArrayLength} from "./util";
+
+  /// Algorithm from Gervasi, Vincenzo and Prencipe, Giuseppe. "On the Efficient Capture of Dangerous Criminals". Third International Conference on \_ FUN with Algorithms, 2004.
+  // This algorithm isn't tweaked for perf.
+  function moveRobotGervasi2004(self, goal, leaders, robots, sensor, scratchpad){
+    var l1 = 50;
+    var E = vec3.create(); vec2.sub(E, leaders[0].pos, self.pos);
+  
+    var l = vec2.length(E);
+    var target = vec3.create(); vec3.scale(target, E, (l - l1) /l );
+    
+    var cord = 2 * l1 * Math.sin( Math.PI / robots.length );
+    
+    var ri = vec3.create();
+    for (var i = 0; i < robots.length; i++){
+      var robot = robots[i];
+      if ( !robot.isSelf){
+        // you'd want to declare ri here, but this is a bad idea
+        // you're creating O( n^2 * t ) objects to be garbage collected
+        
+        vec2.sub(ri, robot.pos, self.pos);
+        var l_p = vec2.length( ri );
+        if ( l_p < cord ){
+          vec2.scaleAndAdd( target, target, ri, ( l_p - cord ) / Math.max(l_p, 0.1) );
+        }
+      }
+    }
+    
+    vec3.add(target, target, self.pos);
+    return target;
+  }
 
 function camfora(){
   /// list of leader (human-controlled) robots (usually only one).
@@ -40,12 +71,6 @@ function camfora(){
   var renderer;
   
   var moveRobots;
-  
-  // this should go into the ui module
-  var needResizeCanvas = false;
-  var needResetStartTime = false;
-  
-  var animationFrameScheduled = true;
   
   var maxPoints = 25;
   
@@ -142,36 +167,6 @@ function camfora(){
     
 
   }
-  /// Algorithm from Gervasi, Vincenzo and Prencipe, Giuseppe. "On the Efficient Capture of Dangerous Criminals". Third International Conference on \_ FUN with Algorithms, 2004.
-  // This algorithm isn't tweaked for perf.
-  function moveRobotGervasi2004(self, goal, leaders, robots, sensor, scratchpad){
-    var l1 = 50;
-    var E = vec3.create(); vec2.sub(E, leaders[0].pos, self.pos);
-  
-    var l = vec2.length(E);
-    var target = vec3.create(); vec3.scale(target, E, (l - l1) /l );
-    
-    var cord = 2 * l1 * Math.sin( Math.PI / robots.length );
-    
-    var ri = vec3.create();
-    for (var i = 0; i < robots.length; i++){
-      var robot = robots[i];
-      if ( !robot.isSelf){
-        // you'd want to declare ri here, but this is a bad idea
-        // you're creating O( n^2 * t ) objects to be garbage collected
-        
-        vec2.sub(ri, robot.pos, self.pos);
-        var l_p = vec2.length( ri );
-        if ( l_p < cord ){
-          vec2.scaleAndAdd( target, target, ri, ( l_p - cord ) / Math.max(l_p, 0.1) );
-        }
-      }
-    }
-    
-    vec3.add(target, target, self.pos);
-    return target;
-  }
- 
 
   function init(){
   // FIXME HACK making sure the leader starts at its position (need better method for robots)
@@ -193,18 +188,6 @@ function camfora(){
       });
   }
   
-  function setArrayLength(to, targetLength, newFunc){
-    var j;
-    
-    // trim to array if it's too long
-    if (targetLength < to.length) {
-      to.length = targetLength;
-    }
-    // add new entries if it's too short
-    for (j = to.length; j < targetLength; j++){
-      to.push( newFunc(j) );
-    }
-  }
   function drawNextFrame(timestamp){
   //https://developer.mozilla.org/en-US/docs/Games/Anatomy
     var i; var j;
