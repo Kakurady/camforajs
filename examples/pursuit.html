@@ -52,7 +52,12 @@
 
 <!-- FIXME run after the DOM is ready  -->
 <script type="text/javascript">
-  camforasim();
+  glMatrix.setMatrixArrayType(Array);
+  
+  camfora = camforasim();
+  
+  camfora.init();
+  camfora.start();
 </script>
 </body>
 </html>
