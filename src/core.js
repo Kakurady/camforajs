@@ -49,9 +49,6 @@ function camfora(){
   
   var maxPoints = 25;
   
-  
-  var svgRenderer = svgRenderer( rendererOptions );
-  
   function addRobot( options ){
     var newRobot = {
       pos: vec3.create(),
@@ -179,8 +176,7 @@ function camfora(){
   function init(){
   // FIXME HACK making sure the leader starts at its position (need better method for robots)
   vec3.copy (leaders[0].movement.endPos, leaders[0].pos);
-  
-    renderer = svgRenderer;
+    renderer = svgRenderer();
     moveRobots = moveRobotGervasi2004;
     
     renderer.init();
