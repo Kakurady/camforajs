@@ -1,7 +1,5 @@
-  "use strict";
-
-  glMatrix.setMatrixArrayType(Array);
-  
+// -*- indent-tabs-mode:nil; tab-width: 2; -*- 
+function camfora(){
   /// list of leader (human-controlled) robots (usually only one).
   var leaders = [
     { 
@@ -48,6 +46,7 @@
   var animationFrameScheduled = true;
   
   var maxPoints = 25;
+  
   
   var svgRenderer = (function makeSVGRenderer( options ){
     var rootElement;
@@ -113,6 +112,8 @@
     }
     
     function init(){
+    
+    
       wrapper = d3.select("#wrapper").insert("div");
       wrapper.classed("camfora-wrapper", true);
       s = wrapper.insert("svg");
@@ -352,10 +353,6 @@
     renderer.addRobot(newRobot);
   }
   
-  
-  
-  // FIXME HACK making sure the leader starts at its position (need better method for robots)
-  vec3.copy (leaders[0].movement.endPos, leaders[0].pos);
   function moveLeader(simulationTime){
     var leader = leaders[0];
     
@@ -442,6 +439,9 @@
  
 
   function init(){
+  // FIXME HACK making sure the leader starts at its position (need better method for robots)
+  vec3.copy (leaders[0].movement.endPos, leaders[0].pos);
+  
     renderer = svgRenderer;
     moveRobots = moveRobotGervasi2004;
     
@@ -585,5 +585,6 @@
   // FIXME: requestAnimationFrame won't work in IE9.
   // Whether we need to support China needs to be thought 
   window.requestAnimationFrame (drawNextFrame);  
-  
-  // next up: make a small demo of moving stuff
+}
+
+export default camfora;

@@ -1,0 +1,12 @@
+{
+  "name": "camforasim",
+  "version": "0.0.0",
+  "devDependencies": {
+    "acorn": "^3.0.4",
+    "estree-walker": "^0.2.0",
+    "gl-matrix": "^2.3.2",
+    "magic-string": "^0.10.2",
+    "rollup": "^0.25.4",
+    "uglifyjs": "^2.4.10"
+  }
+}
