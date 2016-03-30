@@ -1,0 +1,29 @@
+2 point =  1 week
+1 point = 2 day
+0.5 point = 1 day
+
+week ending 3/4:
+visualization of goals: .5
+visualization of trails: .5
+pause and resume: .5
+
+week ending 3/11:
+modularize
+
+week ending 3/18:
+faulty behaviour: 1
+select faulty behaviour: 1
+
+w eek ending 3/25:
+go full screen .5
+camera focus .5
+mouse control 1
+
+week ending 4/1:
+start writing presentation and report
+
+week ending 4/8:
+finish presentation
+
+week ending 4/15:
+finish report 

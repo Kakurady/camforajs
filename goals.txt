@@ -1,0 +1,44 @@
+* P1 - Project Outline Goals
+> observing the robot's behavior
+-> speed up and slow down the robots, because they move too fast
+-> pause the robots
+- choosing simulation settings
+-- Start on paused mode
+-> Level of synchnony
+-> agreement on orientation
+-> [...]
+- Interaction
+-- Dynamic insertion of new robots
+-- Dynamic deletion of robots
+-- Selection of faulty behaviour
+-- (adjust robots' position?)
+- Document choices.
+  They might lead you to questioning those choices too
+-- Why did you choose svg over HTML+CSS, canvas or webgl?
+-- why glmatrix? It doesn't have many features.
+-- why store movement in global coordinates?
+-- why lerp over history?
+   ? what kind of history to store? just movement, or also some state? visualizations?
+   ? how should algorithms be visualized?
+        Current strategy is general vis for some things and specific for others. 
+   ? how should the svg output be organized? 
+* P2 - use case goals
+> I'd like to use this to present robot algorithms at a conference or seminar.
+-- does well being resized
+-- going full screen
+-- endless simulation
+> I'd like to experiment with camfora in private
+-- graph statistics
+-- control panel
+-- endable simulation
+-- export statistics for off-line analysis and later simulations
+> I'd like to embed camfora into a web page for the public.
+-- small file size
+-- modularized loading
+-- minimized dependencies
+> I'd like to show other people on a mobile device.
+-- small file size
+-- performance first
+
+- - todo
+> - story

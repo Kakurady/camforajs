@@ -1,0 +1,31 @@
+What happens in a frame?
+
+JavaScript is single-threaded by default, that means when one piece of JS code is running, all others, including events, has to wait. So from the perspective of the JS programmer, there's no need to worry about synchronizing access to data structures.
+
+However, the browser is a multi-threaded environment, and layout usually happens on a different thread than JS. So if the script need to ask something from the layout engine after changing the document, it might need to wait.
+
+- browser calls drawNextFrame
+    - schedule next frame, if moving
+    - calculate how much time has ticked, if moving
+    - hand control to scheduler, which will
+        - calculate new positions of things <- is this something the scheduler should do?
+        - [apply fault results] <- is this something the scheduler should do?
+        - find robots that need updates
+        - run look and compute for those robots
+        - turn result into trajectory <- is this something the scheduler should do?
+    - [extract data for rendering] <- does it make sense for the scheduler and renderer 
+    - hand control to the renderer, which will
+        - update canvas size, if size just changed
+        - draw leaders
+        - draw robots
+        - [draw trails]
+        - [draw axis]
+        - [draw visualizations]
+    - [hand control to the UI, which will]
+- browser prepares next frame by running layout and such
+- in parallel: other events fire [avoid touching DOM unless necessary, because you need to wait for layout for an answer]
+    - Resize event
+    - zoom events
+    - pressing buttons
+
+- browser calls drawNextFrame again
