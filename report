@@ -16,6 +16,7 @@
 -- output
 --- movement: 
 --- communication: lights
+--- power : unlimited/limited
 Strictest: oblivious robots without coordinate agreement and no communication
 
 - the issue of time
@@ -54,6 +55,17 @@ Want to build something that
 ## Description
 
 ### design
+Design: UI
+Embed in web page, or take full window
+Use sidebar for commands
+On mobile phones, collapses
+(insert photos)
+(not actually implemented)
+Design: API
+(not actually designed)
+External API
+Plugin API
+Design: Visualization
 In general the visualization is specific to the algorithm and renderer
 
 ### implementation
@@ -80,6 +92,8 @@ In general the visualization is specific to the algorithm and renderer
 -- small vs large packages; dependency hell 
 -- 
 
+## Future work
+- time could be 
 
 ## References
 
