@@ -268,13 +268,21 @@ function camfora(){
         // 4. update result
         // set new start position and time
         
-        vec3.copy(robot.movement.startPos, robot.pos);
         robot.movement.startTime = simulationTime;
-        
-        vec3.copy(robot.movement.endPos, robot.goal);
         vec3.sub(howfar, robot.pos, robot.goal);
         var duration = vec3.length(howfar) / robot.speed;
-        robot.movement.endTime = robot.movement.startTime + duration;
+        // cap duration
+        var MAX_DURATION = 0.1;
+        if (duration > MAX_DURATION){
+          var scaler = MAX_DURATION / duration;
+          vec3.copy(robot.movement.startPos, robot.pos);
+          vec3.lerp(robot.movement.endPos, robot.pos, robot.goal, scaler);
+          robot.movement.endTime = robot.movement.startTime + MAX_DURATION;
+        } else {
+          vec3.copy(robot.movement.startPos, robot.pos);
+          vec3.copy(robot.movement.endPos, robot.goal);
+          robot.movement.endTime = robot.movement.startTime + duration;
+        }
         
         robot.trail.push({
           endTime: robot.movement.endTime,
