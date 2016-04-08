@@ -77,9 +77,39 @@
 <script type="text/javascript">
   glMatrix.setMatrixArrayType(Array);
   
-  camfora = camforasim();
+    /// Algorithm from Gervasi, Vincenzo and Prencipe, Giuseppe. "On the Efficient Capture of Dangerous Criminals". Third International Conference on \_ FUN with Algorithms, 2004.
+  // This algorithm isn't tweaked for perf.
+  function moveRobotGervasi2004(self, goal, leaders, robots, sensor, scratchpad){
+    var l1 = 50;
+    var E = vec3.create(); vec2.sub(E, leaders[0].pos, self.pos);
   
-  camfora.init();
+    var l = vec2.length(E);
+    var target = vec3.create(); vec3.scale(target, E, (l - l1) /l );
+    
+    var cord = 2 * l1 * Math.sin( Math.PI / robots.length );
+    
+    var ri = vec3.create();
+    for (var i = 0; i < robots.length; i++){
+      var robot = robots[i];
+      if ( !robot.isSelf){
+        // you'd want to declare ri here, but this is a bad idea
+        // you're creating O( n^2 * t ) objects to be garbage collected
+        
+        vec2.sub(ri, robot.pos, self.pos);
+        var l_p = vec2.length( ri );
+        if ( l_p < cord ){
+          vec2.scaleAndAdd( target, target, ri, ( l_p - cord ) / Math.max(l_p, 0.1) );
+        }
+      }
+    }
+    
+    vec3.add(target, target, self.pos);
+    return target;
+  }
+  
+  camfora = camforasim({
+    algorithm: moveRobotGervasi2004
+  });
   camfora.start();
 </script>
 </body>

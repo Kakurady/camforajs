@@ -2,37 +2,9 @@
 import svgRenderer from "./svgRenderer";
 import {setArrayLength} from "./util";
 
-  /// Algorithm from Gervasi, Vincenzo and Prencipe, Giuseppe. "On the Efficient Capture of Dangerous Criminals". Third International Conference on \_ FUN with Algorithms, 2004.
-  // This algorithm isn't tweaked for perf.
-  function moveRobotGervasi2004(self, goal, leaders, robots, sensor, scratchpad){
-    var l1 = 50;
-    var E = vec3.create(); vec2.sub(E, leaders[0].pos, self.pos);
-  
-    var l = vec2.length(E);
-    var target = vec3.create(); vec3.scale(target, E, (l - l1) /l );
-    
-    var cord = 2 * l1 * Math.sin( Math.PI / robots.length );
-    
-    var ri = vec3.create();
-    for (var i = 0; i < robots.length; i++){
-      var robot = robots[i];
-      if ( !robot.isSelf){
-        // you'd want to declare ri here, but this is a bad idea
-        // you're creating O( n^2 * t ) objects to be garbage collected
-        
-        vec2.sub(ri, robot.pos, self.pos);
-        var l_p = vec2.length( ri );
-        if ( l_p < cord ){
-          vec2.scaleAndAdd( target, target, ri, ( l_p - cord ) / Math.max(l_p, 0.1) );
-        }
-      }
-    }
-    
-    vec3.add(target, target, self.pos);
-    return target;
-  }
 
-function camfora(){
+
+function camfora(options){
   /// list of leader (human-controlled) robots (usually only one).
   var leaders = [
     { 
@@ -168,11 +140,14 @@ function camfora(){
 
   }
 
-  function init(){
+  function init(options){
   // FIXME HACK making sure the leader starts at its position (need better method for robots)
   vec3.copy (leaders[0].movement.endPos, leaders[0].pos);
+  
+    if (options && options.algorithm) {
+      setRobotAlgorithm (options.algorithm);
+    }
     renderer = svgRenderer();
-    moveRobots = moveRobotGervasi2004;
     
     renderer.init();
     
@@ -186,6 +161,8 @@ function camfora(){
       .on("click", function(){
         addRobot();
       });
+      
+    
   }
   
   function drawNextFrame(timestamp){
@@ -315,6 +292,11 @@ function camfora(){
     window.requestAnimationFrame (drawNextFrame);  
   }
   
+  function setRobotAlgorithm(fn){
+    moveRobots = fn;
+  }
+  
+  init(options);
   return {
     init: init,
     start: start
