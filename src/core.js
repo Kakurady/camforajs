@@ -1,5 +1,6 @@
 // -*- indent-tabs-mode:nil; tab-width: 2; -*- 
 import svgRenderer from "./svgRenderer";
+import htmlUI from "./ui";
 import {setArrayLength} from "./util";
 
 
@@ -41,6 +42,7 @@ function camfora(options){
   
   var rendererOptions = {};
   var renderer;
+  var ui;
   
   var moveRobots;
   
@@ -59,7 +61,8 @@ function camfora(options){
       goal: vec3.create(),
       sensed: { leaders: [], robots: [] },
       scratchpad: {},
-      trail: []
+      trail: [],
+      fault: false
     };
     if (options && options.pos){
       vec3.copy(newRobot.pos, options.pos);
@@ -151,16 +154,23 @@ function camfora(options){
     
     renderer.init();
     
+    // FIXME circular dependency?
+    ui = htmlUI(camfora_api);
+    
+    d3.select("#add-robot-button").attr("disabled", null)
+      .on("click", function(){
+        addRobot();
+      });
+      d3.select("#set-fault-button").attr("disabled", null).on("click", function(){ui.setFault()});
+      d3.select("#clear-fault-button").attr("disabled", null).on("click", function(){ui.clearFault()});
+    
     var numRobots = Math.ceil( 2 + Math.random()*5 );
     var i;
     for (i = 0; i < numRobots; i++){
       addRobot();
     }
     
-    d3.select("#add-robot-button").attr("disabled", null)
-      .on("click", function(){
-        addRobot();
-      });
+
       
     
   }
@@ -184,12 +194,14 @@ function camfora(options){
     for (i = 0; i < robots.length; i++){
       // TODO could be using `let` here
       robot = robots[i];
-      vec3.lerp(
-        robot.pos, 
-        robot.movement.startPos, 
-        robot.movement.endPos, 
-        Math.min(1, (simulationTime - robot.movement.startTime) / (robot.movement.endTime - robot.movement.startTime) )
-      );
+      if (!robot.fault){
+        vec3.lerp(
+          robot.pos, 
+          robot.movement.startPos, 
+          robot.movement.endPos, 
+          Math.min(1, (simulationTime - robot.movement.startTime) / (robot.movement.endTime - robot.movement.startTime) )
+        );
+      }
     }
     
     // run computations
@@ -282,6 +294,7 @@ function camfora(options){
       
       // render simulation and visualization
       renderer.renderGraphics( renderData );
+      ui.updateUI( renderData );
     }
   }
   
@@ -296,11 +309,32 @@ function camfora(options){
     moveRobots = fn;
   }
   
-  init(options);
-  return {
-    init: init,
-    start: start
+  function setFault(list){
+    for(var i of list){
+      var robot = robots[i];
+      robot.fault = true;
+      robot.movement.endTime = simulationTime;
+      vec3.copy(robot.movement.endPos, robot.pos);
+    }
   }
+  function clearFault(list){
+    for(var i of list){
+      var robot = robots[i];
+      robot.fault = false;
+    }
+  }
+  
+  var camfora_api = {
+    init: init,
+    start: start,
+    fob: function(){ui.fob();},
+    setFault: setFault,
+    clearFault: clearFault,
+    addRobot: addRobot,
+    ui: ui
+  }
+  init(options);
+  return camfora_api;
 }
 
 export default camfora;
