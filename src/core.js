@@ -33,6 +33,8 @@ function camfora(options){
   /// (scheduler private variable; may change due to pausing simulations)
   var startTime;
   
+  var simulationSpeed = 1;
+  
   /// data passed to renderer. May not countain all data from source.
   /// (core private variable, cached to minimize GC)
   var renderData = {
@@ -136,7 +138,7 @@ function camfora(options){
       vec3.sub(howfar, leader.pos, leader.movement.endPos);
       var duration = vec2.length(howfar) / leader.speed;
       // set a random speed
-      duration = duration * ( 0.5 + Math.random(0.5) );
+      duration = duration * ( 1.0 + Math.random(1.0) );
       leader.movement.endTime = leader.movement.startTime + duration;
     }
     
@@ -162,16 +164,7 @@ function camfora(options){
         addRobot();
       });
       d3.select("#set-fault-button").attr("disabled", null).on("click", function(){ui.setFault()});
-      d3.select("#clear-fault-button").attr("disabled", null).on("click", function(){ui.clearFault()});
-    
-    var numRobots = Math.ceil( 2 + Math.random()*5 );
-    var i;
-    for (i = 0; i < numRobots; i++){
-      addRobot();
-    }
-    
-
-      
+      d3.select("#clear-fault-button").attr("disabled", null).on("click", function(){ui.clearFault()});    
     
   }
   
@@ -185,7 +178,8 @@ function camfora(options){
     window.requestAnimationFrame(drawNextFrame);
     
     startTime = startTime || timestamp;
-    simulationTime = (timestamp - startTime) / 1000;
+    simulationTime = simulationTime + (timestamp - startTime) / 1000 * simulationSpeed;
+    startTime = timestamp;
     
     // TODO: poll manual leader movement (gamepad/mouse)
     
@@ -324,6 +318,10 @@ function camfora(options){
     }
   }
   
+  function setSpeed(speed){
+    simulationSpeed = speed;
+  }
+  
   var camfora_api = {
     init: init,
     start: start,
@@ -331,7 +329,8 @@ function camfora(options){
     setFault: setFault,
     clearFault: clearFault,
     addRobot: addRobot,
-    ui: ui
+    ui: ui,
+    setSpeed: setSpeed
   }
   init(options);
   return camfora_api;
