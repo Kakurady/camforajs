@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<!-- -*- indent-tabs-mode:nil; tab-width: 2; -*- -->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Page Title</title>
+
+  <script src="ext/d3/d3.js" charset="utf-8"></script>
+  <script src="ext/gl-matrix/gl-matrix.js" charset="utf-8"></script>
+  <script src="../dist/camfora.js" charset="utf-8"></script>
+
+  <style type="text/css">
+  
+  #out-wrapper {
+    position:absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+  }
+  #wrapper {
+    margin: 0 300px 0 0;
+    height: 100%;
+  }
+  
+  #sidebar {
+    position: absolute;
+    width: 300px;
+    height: 100%;
+    right: 0;
+    z-index: 100;
+  }
+  
+  .camfora-wrapper {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* plot css */
+  .axis line, .axis path {
+    fill: none;
+    stroke: black;
+  }
+  
+  .robot {
+    fill: currentColor;
+  }
+  
+  .goal {
+    fill: currentColor;
+    stroke: black;
+    stroke-width: 1px;
+  }
+  
+  .trail {
+    fill: none;
+    stroke: black;
+    stroke-width: 1px;
+  }
+  
+  #add-robot-button {
+    margin:0.5em;
+  }
+  .camfora-sidebar {
+    margin: 0.5em;
+  }
+  </style>
+<body>
+
+<div id="out-wrapper">
+  <div id="sidebar">
+    <button id="add-robot-button" disabled>Add Robot</button>
+    <button id="set-fault-button" disabled>Set Fault</button>
+    <button id="clear-fault-button" disabled>Clear Fault</button>
+  </div>
+  <div id="wrapper"></div>
+</div>
+<!-- FIXME run after the DOM is ready  -->
+<script type="text/javascript">
+  glMatrix.setMatrixArrayType(Array);
+  
+  var temp_vec2;
+  var temp_vec2_a;
+  var temp_vec2_b;
+  
+  function segmentDistanceToPoint(p0, p1, center){
+    "use strict";
+    if(!temp_vec2) {temp_vec2 = vec2.create();}
+    if(!temp_vec2_a) {temp_vec2_a = vec2.create();}
+    if(!temp_vec2_b) {temp_vec2_b = vec2.create();}
+            
+    var dist = vec2.distance(p0, p1);
+    vec2.subtract(temp_vec2, p1, p0);
+    vec2.normalize(temp_vec2, temp_vec2);
+    // temp_vec2 is now (p1 - p0) / |p1 - p0|
+    vec2.subtract(temp_vec2_a, center, p0);
+    // temp_vec2_a is now (center - p0)
+    
+    // project the vector from p0 to circle center onto the segment,
+    // and find where on the segment it lies.
+    var projected_length = vec2.dot(temp_vec2, temp_vec2_a);
+    if (projected_length < 0){
+      // outside the segment, closest to p0
+      return vec2.distance(p0, center);
+    } else if (projected_length > dist) {
+      // outside the segment, closest to p1
+      return vec2.distance(p1, center);
+    } else {
+      // on the segment
+      vec2.scale(temp_vec2_b, temp_vec2, projected_length);
+      vec2.add(temp_vec2_b, temp_vec2_b, p0);
+      return vec2.distance (center, temp_vec2_b);
+    }
+  }
+  
+  function segmentIntersectsCircle(p0, p1, center, radius){
+    return segmentDistanceToPoint(p0, p1, center) < radius;
+  }
+  
+  function angleBetween(p1, p0, p2){
+    var angle1 = Math.atan2(p1[0]-p0[0],p1[1]-p0[1]);
+    var angle2 = Math.atan2(p2[0]-p0[0],p2[1]-p0[1]);
+    if (angle2 >= 0 && angle1 < 0) {}
+    var angle = angle2 - angle1;
+    if (angle < -Math.PI) {angle += (2 * Math.PI);}
+    if (angle > Math.PI) {angle -= (2 * Math.PI);}
+    return angle;
+  }
+  
+  
+    /// Algorithm from Gervasi, Vincenzo and Prencipe, Giuseppe. "On the Efficient Capture of Dangerous Criminals". Third International Conference on \_ FUN with Algorithms, 2004.
+  // This algorithm isn't tweaked for perf.
+  function moveRobotGervasi2004(self, goal, leaders, robots, sensor, scratchpad){
+    var r1 = 100;
+    var delta = 20;
+    var epsilon = 1.1;
+  
+    var i;
+    var chief_index = 0;
+    var chief_dist = vec2.distance(leaders[0].pos, robots[0].pos);
+    var dist; //temp
+    var target;
+    for (i=1; i < robots.length; i++){
+        dist = vec2.distance(leaders[0].pos, robots[i].pos);
+        if (dist < chief_dist) {
+          chief_dist = dist;
+          chief_index = i;
+        }
+    }
+    var chief = robots[chief_index];
+    if (chief.isSelf){
+      if (false && chief_dist > r1){
+        return leaders[0].pos;
+      } else {
+        //hack
+        target = vec3.create();
+        vec3.lerp(target, leaders[0].pos, chief.pos, r1 / chief_dist );
+        return target;
+      }
+    } else {
+      if(!temp_vec2) {temp_vec2 = vec2.create();}
+      if(!temp_vec2_a) {temp_vec2_a = vec2.create();}
+      if(!temp_vec2_b) {temp_vec2_b = vec2.create();}
+    
+      var r = Math.max(r1, chief_dist);
+      vec2.sub( temp_vec2, chief.pos, leaders[0].pos);
+      var theta = Math.atan2(temp_vec2[1], temp_vec2[0]);
+      robots.sort(function(a,b){ 
+        vec2.sub( temp_vec2_a, a.pos, leaders[0].pos);
+        vec2.sub( temp_vec2_b, b.pos, leaders[0].pos);
+        var a_angle =  Math.atan2(temp_vec2_a[1], temp_vec2_a[0]);
+        var b_angle =  Math.atan2(temp_vec2_b[1], temp_vec2_b[0]);
+        if (a_angle < theta) { a_angle += Math.PI * 2; }
+        if (b_angle < theta) { b_angle += Math.PI * 2; }
+        return a_angle - b_angle;
+      });
+      var k = 0;
+      for (i = 0; i < robots.length; i++){
+        if (robots[i].isSelf) {
+          k = i;
+          i = robots.length;
+        }
+      }
+      var phi = Math.PI * 2 / robots.length;
+      var alpha = k * phi + theta;
+      target = vec3.fromValues(chief_dist * epsilon, 0, 0);
+      var mat = mat2d.create();
+      mat2d.rotate(mat, mat, alpha);
+      vec2.transformMat2d(target, target, mat);
+      vec2.add(target,target,leaders[0].pos);
+      // if circle radius is chief_dist * epsilon it by definition intersects! 
+      if (segmentIntersectsCircle(self.pos, target, leaders[0].pos, chief_dist )){
+        var beta = Math.atan2(target[1]-self.pos[1], target[0]-self.pos[0]);
+        var gamma = angleBetween(self.pos, leaders[0].pos, target);
+        if (gamma > 0) {
+          beta += Math.PI / 2;
+        } else {
+          beta -= Math.PI / 2;
+        }
+        vec2.set(target, delta * Math.cos(beta), delta * Math.sin(beta));
+        vec2.add(target, target, self.pos);
+      }
+      return target;
+    }
+    //chief = closest cop to I;
+    //chief_dist = dist(chief, i)
+    //if self is chief
+    //  if chief_dist > r1 then
+    //    moveTo(I)
+    //  else
+    //    moveto(self)
+    //else
+    //  r = max(r1, chief_dist);
+    //  sort(Cops,  Angle(I, chief ))
+    //  k = myRank
+    //  phi = Math.PI * 2 / cops.length;
+    //  theta = angle(I, chief)
+    //  alpha = k * phi + theta;
+    //  target = I.pos + rot(x = chief_dist + epsilon, alpha);
+    //  if (self->target) intersects C
+    //    target = nonIntersTarget(I, target, r')
+    //  moveTo(target)
+    //end if
+  
+    var l1 = 50;
+    var E = vec3.create(); vec2.sub(E, leaders[0].pos, self.pos);
+  
+    var l = vec2.length(E);
+    var target = vec3.create(); vec3.scale(target, E, (l - l1) /l );
+    
+    var cord = 2 * l1 * Math.sin( Math.PI / robots.length );
+    
+    var ri = vec3.create();
+    for (var i = 0; i < robots.length; i++){
+      var robot = robots[i];
+      if ( !robot.isSelf){
+        // you'd want to declare ri here, but this is a bad idea
+        // you're creating O( n^2 * t ) objects to be garbage collected
+        
+        vec2.sub(ri, robot.pos, self.pos);
+        var l_p = vec2.length( ri );
+        if ( l_p < cord ){
+          vec2.scaleAndAdd( target, target, ri, ( l_p - cord ) / Math.max(l_p, 0.1) );
+        }
+      }
+    }
+    
+    vec3.add(target, target, self.pos);
+    return target;
+  }
+  
+  camfora = camforasim({
+    algorithm: moveRobotGervasi2004
+  });
+  var numRobots = Math.ceil( 2 + Math.random()*0 );
+    var i;
+    for (i = 0; i < numRobots; i++){
+      camfora.addRobot();
+  }
+  
+  camfora.setSpeed(0.5);
+  camfora.start();
+</script>
+</body>
+</html>
